@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="An interactive, code-level walkthrough of the Index custom RAG application."
+    />
+    <title>Index — architecture explorer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #171714;
+        --muted: #68675f;
+        --paper: #f3f0e7;
+        --panel: #e9e5d9;
+        --soft: #faf8f2;
+        --line: #cbc5b8;
+        --signal: #ee5f35;
+        --signal-dark: #bd4422;
+        --good: #2f7d5b;
+        --blue: #315f7a;
+        --purple: #6c5684;
+        --shadow: rgba(23, 23, 20, 0.08);
+        font-family: "Avenir Next", Avenir, Inter, system-ui, -apple-system, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: var(--paper); min-height: 100vh; }
+      button, a { font: inherit; }
+      button { color: inherit; }
+      a { color: inherit; }
+      code, .mono {
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      .topbar {
+        min-height: 68px;
+        padding: 16px clamp(20px, 4vw, 56px);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        background: rgba(243, 240, 231, 0.94);
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(14px);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        font: 600 15px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.17em;
+      }
+
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+        border: 1.5px solid var(--ink);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        letter-spacing: 0;
+      }
+
+      .topbar-links { display: flex; align-items: center; gap: 9px; }
+      .quiet-link {
+        border: 1px solid var(--line);
+        padding: 9px 12px;
+        text-decoration: none;
+        font: 600 10px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.05em;
+        background: transparent;
+      }
+      .quiet-link:hover { border-color: var(--ink); background: var(--soft); }
+
+      .hero {
+        padding: clamp(46px, 8vw, 94px) clamp(20px, 6vw, 90px) clamp(36px, 6vw, 70px);
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.55fr);
+        gap: clamp(34px, 7vw, 100px);
+        align-items: end;
+      }
+
+      .kicker {
+        margin: 0 0 13px;
+        color: var(--signal-dark);
+        font: 600 11px/1.25 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.13em;
+      }
+      .hero h1 {
+        font-size: clamp(46px, 7.2vw, 104px);
+        line-height: 0.9;
+        letter-spacing: -0.07em;
+        margin: 0;
+        max-width: 940px;
+      }
+      .hero-copy { color: var(--muted); font-size: 16px; line-height: 1.7; margin: 0 0 22px; }
+      .ownership-note {
+        border-left: 3px solid var(--signal);
+        padding: 2px 0 2px 15px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .ownership-note strong { display: block; margin-bottom: 2px; }
+
+      .walkthrough {
+        display: grid;
+        grid-template-columns: 286px minmax(0, 1fr);
+        min-height: 900px;
+      }
+
+      .stage-sidebar {
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        padding: 28px 20px 38px;
+      }
+      .stage-sidebar-inner { position: sticky; top: 96px; }
+      .stage-sidebar h2 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.03em; }
+      .stage-sidebar > .stage-sidebar-inner > p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+        margin: 0 0 22px;
+      }
+      .progress-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font: 600 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.08em;
+      }
+      .progress-track { height: 2px; background: var(--line); margin: 9px 0 24px; overflow: hidden; }
+      .progress-fill { display: block; height: 100%; width: 0; background: var(--signal); transition: width 220ms ease; }
+      .nav-group { margin: 0 0 22px; }
+      .nav-group-label {
+        color: var(--muted);
+        font: 600 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.12em;
+        margin: 0 0 7px 10px;
+      }
+      .stage-button {
+        width: 100%;
+        border: 0;
+        border-left: 2px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+        padding: 8px 10px;
+        color: var(--muted);
+      }
+      .stage-button:hover { background: rgba(255, 255, 255, 0.35); color: var(--ink); }
+      .stage-button[aria-current="step"] {
+        border-left-color: var(--signal);
+        color: var(--ink);
+        background: var(--soft);
+      }
+      .stage-number { font: 600 9px/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace; color: var(--signal-dark); }
+      .stage-button-title { font-size: 12px; line-height: 1.35; font-weight: 600; }
+
+      .stage-main { min-width: 0; padding: 32px clamp(20px, 4vw, 64px) 70px; }
+      .system-map { margin-bottom: 42px; }
+      .map-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+      .map-heading h2 { font-size: 22px; margin: 0; letter-spacing: -0.04em; }
+      .map-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+      .data-chain {
+        border: 1px solid var(--line);
+        background: var(--soft);
+        padding: 13px 15px;
+        margin-bottom: 18px;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 18px;
+        align-items: center;
+      }
+      .data-chain-label {
+        color: var(--signal-dark);
+        font: 600 9px/1.35 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.1em;
+      }
+      .data-chain ol {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .data-chain li { display: inline-flex; align-items: center; gap: 8px; }
+      .data-chain li:not(:last-child)::after { content: "\2192"; color: var(--signal-dark); }
+      .data-chain code { font-size: 9px; font-weight: 600; }
+      .flow-lane { border-top: 1px solid var(--line); padding: 15px 0 5px; display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 12px; }
+      .lane-label {
+        color: var(--muted);
+        font: 600 9px/1.35 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.1em;
+        padding-top: 11px;
+      }
+      .lane-nodes { display: flex; align-items: stretch; gap: 7px; min-width: 0; }
+      .map-node {
+        flex: 1 1 0;
+        min-width: 88px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.24);
+        cursor: pointer;
+        padding: 10px 8px;
+        text-align: left;
+        opacity: 0.44;
+        transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease, background 160ms ease;
+      }
+      .map-node:hover { opacity: 0.85; transform: translateY(-1px); }
+      .map-node.is-active { opacity: 1; border-color: var(--signal); background: var(--soft); box-shadow: 3px 3px 0 var(--shadow); }
+      .map-node strong { display: block; font-size: 11px; line-height: 1.25; }
+      .map-node span { display: block; margin-top: 3px; color: var(--muted); font: 500 8px/1.25 ui-monospace, "SFMono-Regular", Menlo, monospace; }
+      .map-arrow { align-self: center; color: #9c9689; font-family: ui-monospace, monospace; }
+
+      .stage-focus { border-top: 4px solid var(--ink); padding-top: 24px; }
+      .focus-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: start; }
+      .stage-meta { display: flex; gap: 10px; align-items: center; margin-bottom: 11px; }
+      .phase-badge, .implementation-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 25px;
+        padding: 4px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font: 600 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+        letter-spacing: 0.08em;
+      }
+      .phase-badge { border-color: var(--signal); color: var(--signal-dark); }
+      .implementation-badge { color: var(--good); }
+      .implementation-badge[data-tone="roadmap"] { color: var(--signal-dark); border-color: var(--signal); }
+      .stage-focus h2 { font-size: clamp(34px, 5vw, 65px); line-height: 0.96; letter-spacing: -0.058em; margin: 0 0 13px; max-width: 920px; }
+      .stage-summary { color: var(--muted); font-size: 17px; line-height: 1.55; max-width: 860px; margin: 0; }
+      .view-controls { display: flex; gap: 5px; border: 1px solid var(--line); padding: 4px; background: var(--soft); }
+      .view-button { border: 0; background: transparent; padding: 8px 10px; cursor: pointer; font: 600 9px/1 ui-monospace, monospace; }
+      .view-button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+      .explanation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 34px 0; }
+      .explanation { background: var(--soft); padding: clamp(20px, 3vw, 34px); }
+      .explanation-label { color: var(--signal-dark); font: 600 10px/1 ui-monospace, monospace; letter-spacing: 0.1em; margin-bottom: 14px; }
+      .explanation h3 { font-size: 21px; letter-spacing: -0.03em; margin: 0 0 10px; }
+      .explanation p { font-size: 14px; line-height: 1.75; margin: 0; }
+      .focus-content[data-view="plain"] .technical-view { display: none; }
+      .focus-content[data-view="technical"] .plain-view { display: none; }
+      .focus-content[data-view="plain"] .explanation-grid,
+      .focus-content[data-view="technical"] .explanation-grid { grid-template-columns: 1fr; }
+
+      .section-heading { margin: 38px 0 15px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+      .section-heading h3 { margin: 0; font-size: 22px; letter-spacing: -0.035em; }
+      .section-heading span { color: var(--muted); font: 500 9px/1 ui-monospace, monospace; letter-spacing: 0.08em; }
+
+      .io-flow { display: grid; grid-template-columns: 1fr 34px 1.25fr 34px 1fr; align-items: stretch; }
+      .io-box { border: 1px solid var(--line); padding: 18px; background: rgba(255, 255, 255, 0.2); min-width: 0; }
+      .io-box.operation { background: var(--panel); }
+      .io-box-label { color: var(--muted); font: 600 9px/1 ui-monospace, monospace; letter-spacing: 0.09em; margin-bottom: 10px; }
+      .io-box ul { padding-left: 18px; margin: 0; }
+      .io-box li { font-size: 12px; line-height: 1.55; margin: 4px 0; }
+      .io-arrow { display: grid; place-items: center; color: var(--signal-dark); font-family: ui-monospace, monospace; }
+
+      .trace { margin: 0; padding: 0; list-style: none; counter-reset: trace; border-top: 1px solid var(--line); }
+      .trace li { counter-increment: trace; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; border-bottom: 1px solid var(--line); padding: 13px 0; align-items: start; }
+      .trace li::before { content: counter(trace, decimal-leading-zero); color: var(--signal-dark); font: 600 9px/1.6 ui-monospace, monospace; }
+      .trace code { color: var(--blue); font-weight: 600; word-break: break-word; }
+      .trace p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+      .detail-columns { display: grid; grid-template-columns: 0.82fr 1.18fr; gap: 28px; }
+      .tech-list { display: grid; gap: 8px; }
+      .tech-item { border-left: 2px solid var(--line); padding: 4px 0 4px 12px; }
+      .tech-item strong { font-size: 12px; }
+      .tech-item p { color: var(--muted); margin: 3px 0 0; font-size: 11px; line-height: 1.5; }
+      .file-list { border-top: 1px solid var(--line); }
+      .file-item { border-bottom: 1px solid var(--line); padding: 12px 0; }
+      .file-path { color: var(--purple); font: 600 10px/1.45 ui-monospace, monospace; word-break: break-all; }
+      .file-symbols { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+      .file-symbols code { color: var(--ink); }
+
+      .guardrails { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .guardrail, .glossary { border-top: 2px solid var(--ink); padding-top: 14px; }
+      .guardrail h4, .glossary h4 { margin: 0 0 10px; font-size: 14px; }
+      .guardrail ul { margin: 0; padding-left: 18px; }
+      .guardrail li { color: var(--muted); font-size: 11px; line-height: 1.55; margin: 5px 0; }
+      .terms { margin: 0; display: grid; gap: 8px; }
+      .terms div { display: grid; grid-template-columns: minmax(80px, 0.35fr) 1fr; gap: 10px; }
+      .terms dt { font: 600 10px/1.5 ui-monospace, monospace; color: var(--signal-dark); }
+      .terms dd { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+      .readiness-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .readiness-card { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.2); padding: 16px; }
+      .readiness-status {
+        color: var(--muted);
+        font: 600 8px/1 ui-monospace, monospace;
+        letter-spacing: 0.1em;
+      }
+      .readiness-status[data-tone="done"] { color: var(--good); }
+      .readiness-status[data-tone="warning"] { color: var(--signal-dark); }
+      .readiness-card strong { display: block; margin-top: 9px; font-size: 13px; }
+      .readiness-card p { color: var(--muted); margin: 5px 0 0; font-size: 11px; line-height: 1.55; }
+
+      .stage-actions { border-top: 1px solid var(--line); margin-top: 46px; padding-top: 20px; display: flex; justify-content: space-between; gap: 12px; }
+      .nav-action { border: 1px solid var(--ink); background: transparent; padding: 12px 15px; cursor: pointer; font: 600 10px/1 ui-monospace, monospace; }
+      .nav-action:hover:not(:disabled) { background: var(--soft); }
+      .nav-action.primary { background: var(--signal); color: #fff; border-color: var(--signal); }
+      .nav-action.primary:hover:not(:disabled) { background: var(--signal-dark); }
+      .nav-action:disabled { opacity: 0.28; cursor: not-allowed; }
+
+      .page-footer { padding: 32px clamp(20px, 6vw, 90px); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.6; display: flex; justify-content: space-between; gap: 24px; }
+      .page-footer strong { color: var(--ink); }
+
+      @media (max-width: 1080px) {
+        .walkthrough { grid-template-columns: 240px minmax(0, 1fr); }
+        .lane-nodes { flex-wrap: wrap; }
+        .map-arrow { display: none; }
+        .map-node { flex: 1 1 130px; }
+        .focus-head { grid-template-columns: 1fr; }
+        .view-controls { width: max-content; }
+      }
+
+      @media (max-width: 820px) {
+        .hero { grid-template-columns: 1fr; }
+        .walkthrough { display: block; }
+        .stage-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+        .stage-sidebar-inner { position: static; }
+        #stage-navigation { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+        .nav-group { margin-bottom: 0; }
+        .stage-main { padding-top: 26px; }
+        .explanation-grid, .detail-columns, .guardrails, .readiness-grid { grid-template-columns: 1fr; }
+        .data-chain { grid-template-columns: 1fr; gap: 8px; }
+        .io-flow { grid-template-columns: 1fr; gap: 7px; }
+        .io-arrow { transform: rotate(90deg); min-height: 24px; }
+      }
+
+      @media (max-width: 540px) {
+        .topbar { align-items: flex-start; }
+        .topbar-links { flex-direction: column; align-items: flex-end; }
+        .hero h1 { font-size: 48px; }
+        #stage-navigation { grid-template-columns: 1fr; }
+        .flow-lane { grid-template-columns: 1fr; }
+        .lane-label { padding-top: 0; }
+        .map-node { min-height: 58px; }
+        .stage-focus h2 { font-size: 38px; }
+        .view-controls { width: 100%; }
+        .view-button { flex: 1; min-height: 42px; }
+        .stage-actions { align-items: stretch; }
+        .nav-action { min-height: 48px; }
+        .page-footer { flex-direction: column; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Return to Index">
+        <span class="brand-mark" aria-hidden="true">I</span>
+        <span>INDEX</span>
+      </a>
+      <div class="topbar-links">
+        <span class="mono">ARCHITECTURE / CODE MAP</span>
+        <a class="quiet-link" href="/">BACK TO APP</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="kicker">YOUR PIPELINE / EXPLAINED END TO END</p>
+        <h1>One file in.<br />Evidence-linked answer out.</h1>
+      </div>
+      <div>
+        <p class="hero-copy">
+          Follow one document from upload to vectors, then follow one question from words to a
+          cited answer. Every step below points to the real class and function that performs it.
+        </p>
+        <div class="ownership-note">
+          <strong>The central design decision</strong>
+          Your application owns the files, chunks, database, search, ranking, context, citations,
+          and deletion. OpenAI is a replaceable model provider—not the owner of this RAG system.
+        </div>
+      </div>
+    </section>
+
+    <div class="walkthrough">
+      <aside class="stage-sidebar" aria-label="Architecture stages">
+        <div class="stage-sidebar-inner">
+          <h2>Walk the pipeline</h2>
+          <p>Choose any stage, use Previous/Next, or press the left and right arrow keys.</p>
+          <div class="progress-label">
+            <span id="progress-stage">STAGE 01</span>
+            <span id="progress-total">OF 15</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Architecture walkthrough progress" aria-valuemin="1" aria-valuemax="15" aria-valuenow="1">
+            <span class="progress-fill" id="progress-fill"></span>
+          </div>
+          <nav id="stage-navigation"></nav>
+        </div>
+      </aside>
+
+      <main class="stage-main">
+        <section class="system-map" aria-labelledby="system-map-title">
+          <div class="map-heading">
+            <div>
+              <p class="kicker">INTERACTIVE SYSTEM MAP</p>
+              <h2 id="system-map-title">The highlighted boxes perform this stage</h2>
+            </div>
+            <p>Every box is clickable.</p>
+          </div>
+          <div class="data-chain" aria-label="The main data objects created by the pipeline">
+            <span class="data-chain-label">DATA CHANGES SHAPE</span>
+            <ol>
+              <li><code>File bytes</code></li>
+              <li><code>Block</code></li>
+              <li><code>Chunk</code></li>
+              <li><code>Vector</code></li>
+              <li><code>Candidate</code></li>
+              <li><code>SourceExcerpt [S#]</code></li>
+              <li><code>AnswerResult</code></li>
+            </ol>
+          </div>
+          <div id="flow-map"></div>
+        </section>
+
+        <article class="stage-focus" aria-live="polite">
+          <div class="focus-head">
+            <div>
+              <div class="stage-meta">
+                <span class="phase-badge" id="phase-badge"></span>
+                <span class="implementation-badge" id="implementation-badge">IMPLEMENTED</span>
+              </div>
+              <h2 id="stage-title"></h2>
+              <p class="stage-summary" id="stage-summary"></p>
+            </div>
+            <div class="view-controls" role="group" aria-label="Explanation detail">
+              <button class="view-button" type="button" data-view="plain" aria-pressed="false">PLAIN</button>
+              <button class="view-button" type="button" data-view="both" aria-pressed="true">BOTH</button>
+              <button class="view-button" type="button" data-view="technical" aria-pressed="false">TECH</button>
+            </div>
+          </div>
+
+          <div class="focus-content" id="focus-content" data-view="both">
+            <div class="explanation-grid">
+              <section class="explanation plain-view">
+                <div class="explanation-label">IN LAYMAN TERMS</div>
+                <h3 id="plain-title"></h3>
+                <p id="plain-copy"></p>
+              </section>
+              <section class="explanation technical-view">
+                <div class="explanation-label">TECHNICALLY</div>
+                <h3 id="technical-title"></h3>
+                <p id="technical-copy"></p>
+              </section>
+            </div>
+
+            <section>
+              <div class="section-heading"><h3>What moves through this stage</h3><span>INPUT → WORK → OUTPUT</span></div>
+              <div class="io-flow" id="io-flow"></div>
+            </section>
+
+            <section class="technical-view">
+              <div class="section-heading"><h3>Actual code path</h3><span>CALL ORDER</span></div>
+              <ol class="trace" id="code-trace"></ol>
+            </section>
+
+            <div class="detail-columns technical-view">
+              <section>
+                <div class="section-heading"><h3>Technologies</h3><span>AND THEIR JOB</span></div>
+                <div class="tech-list" id="technology-list"></div>
+              </section>
+              <section>
+                <div class="section-heading"><h3>Where it lives</h3><span>FILES + SYMBOLS</span></div>
+                <div class="file-list" id="file-list"></div>
+              </section>
+            </div>
+
+            <div class="guardrails">
+              <section class="guardrail">
+                <h4>Why this is safe and reliable</h4>
+                <ul id="guardrail-list"></ul>
+              </section>
+              <section class="glossary plain-view">
+                <h4>Terms translated</h4>
+                <dl class="terms" id="term-list"></dl>
+              </section>
+            </div>
+
+            <section id="readiness-section" hidden>
+              <div class="section-heading"><h3>Reality check</h3><span>BUILT / CONFIGURABLE / NEXT</span></div>
+              <div class="readiness-grid" id="readiness-grid"></div>
+            </section>
+          </div>
+
+          <div class="stage-actions">
+            <button class="nav-action" type="button" id="previous-stage">← PREVIOUS</button>
+            <button class="nav-action primary" type="button" id="next-stage">NEXT STAGE →</button>
+          </div>
+        </article>
+      </main>
+    </div>
+
+    <footer class="page-footer">
+      <span><strong>Source of truth:</strong> the current repository, not a generic RAG template.</span>
+      <span>OpenAI calls are isolated behind adapters; local providers remain available for development.</span>
+    </footer>
+
+    <script>
+      "use strict";
+
+      const stages = [
+        {
+          phase: "FOUNDATION",
+          group: "00 / ORIENTATION",
+          nav: "Own the whole pipeline",
+          title: "The system you are actually building",
+          summary: "A self-managed document question-answering system with two journeys: indexing knowledge and retrieving evidence.",
+          plainTitle: "Think of it as a local research librarian",
+          plain: "You hand the librarian files. It carefully labels and shelves small passages. When you ask a question, it finds the best passages first and gives them to a writer. The writer is instructed to use only those passages and show its source labels; the app verifies the labels, while deeper claim-by-claim checking remains future work.",
+          technicalTitle: "Provider-neutral RAG with owned retrieval",
+          technical: "FastAPI owns the application boundary; MinIO stores immutable originals; PostgreSQL stores lifecycle metadata, text, full-text indexes, and pgvector embeddings; Redis and Celery run ingestion asynchronously. OpenAI supplies embeddings and generation through narrow adapters. No hosted File Search, hosted vector store, or LangChain orchestration is used.",
+          input: ["PDF, DOCX, Markdown, HTML, or TXT", "A natural-language question", "Optional recent conversation"],
+          operation: ["Ingest and publish a searchable index", "Retrieve and rank evidence", "Generate an evidence-constrained answer and validate its source labels"],
+          output: ["READY document versions", "Ranked source passages", "Answer with [S#] citations or an abstention"],
+          trace: [
+            ["upload_document()", "Accepts and registers a source file."],
+            ["ingest_document()", "Runs parsing, chunking, embedding, and publishing in a worker."],
+            ["answer_question()", "Routes exact counts or starts semantic retrieval."],
+            ["RetrievalService.answer()", "Owns search, ranking, context assembly, generation, and validation."]
+          ],
+          technologies: [
+            ["FastAPI + Pydantic", "Typed HTTP routes and request/response contracts."],
+            ["PostgreSQL + pgvector", "Transactional metadata, full-text search, vectors, and cosine retrieval."],
+            ["MinIO / S3", "Original source files kept separately from searchable chunks."],
+            ["Redis + Celery", "Background delivery and execution of ingestion jobs."],
+            ["OpenAI adapters", "text-embedding-3-small for vectors and gpt-5.6-luna for evidence-constrained writing."]
+          ],
+          files: [
+            ["src/rag/api/app.py", "upload_document · answer_question · health"],
+            ["src/rag/ingestion/service.py", "IngestionService"],
+            ["src/rag/retrieval/service.py", "RetrievalService"],
+            ["src/rag/providers.py", "create_embedding_provider · create_generator"],
+            ["compose.yaml", "api · worker · postgres · redis · minio · migrate"]
+          ],
+          guardrails: [
+            "Only current READY document versions can be searched.",
+            "The model never chooses or searches files; your retrieval code does.",
+            "Retrieved document text is explicitly marked as untrusted reference data.",
+            "OpenAI receives text to embed and, at answer time, only the question, limited history, and selected evidence; it receives no database or blob-store access.",
+            "Provider interfaces make OpenAI replaceable without rewriting the pipeline."
+          ],
+          terms: [
+            ["RAG", "Find evidence first, then ask a model to answer from it."],
+            ["Provider", "A replaceable service that performs one job, such as embeddings."],
+            ["Grounded", "Supported by passages that the application can show."],
+            ["Adapter", "A small translator between your code and an external service."]
+          ],
+          actors: ["upload-ui", "api", "blob", "queue", "worker", "parser", "chunker", "embed", "database", "question-ui", "router", "count", "retrieve", "rank", "context", "generate", "validate", "answer-ui"]
+        },
+        {
+          phase: "INGEST 01",
+          group: "01 / INGESTION",
+          nav: "Upload and validate",
+          title: "Accept a file without trusting it",
+          summary: "The browser sends raw bytes; the API checks filename extension and size, sanitizes the name, and performs a best-effort duplicate lookup before work is queued.",
+          plainTitle: "The front desk checks the package",
+          plain: "The user drops in a file. The app checks that its filename ends in a supported extension, that it is not empty, and that it fits the size limit. It gives the file a safe display name and creates a fingerprint; an ordinary repeat upload reuses the matching record. It does not inspect a file signature, and simultaneous uploads can still race.",
+          technicalTitle: "Multipart upload with bounded reads and best-effort SHA-256 deduplication",
+          technical: "uploadFiles() builds FormData and posts to /api/documents. FastAPI reads at most MAX_UPLOAD_BYTES + 1, validates the filename suffix against SUPPORTED_EXTENSIONS, normalizes the display name with safe_filename(), derives a MIME hint, and computes a SHA-256 content hash. A scoped application-level lookup usually catches duplicates before blob writes, but no database uniqueness constraint makes this race-free; a matching non-deleted FAILED version is returned rather than automatically requeued.",
+          input: ["Browser File object", "Filename and MIME hint", "Maximum upload setting: 50 MiB"],
+          operation: ["Sanitize filename and validate its suffix", "Read with a hard byte ceiling", "Validate size, derive MIME hint, and hash content", "Look up an existing scoped hash"],
+          output: ["Validated immutable bytes", "Safe display metadata", "Existing result or a new upload path"],
+          trace: [
+            ["uploadFiles(files)", "Filters extensions and builds browser FormData."],
+            ["POST /api/documents", "Carries the multipart file to FastAPI."],
+            ["safe_filename() + suffix check", "Sanitizes the name and rejects unsupported extensions before reading."],
+            ["upload_document(file)", "Reads one byte beyond the limit, rejects empty/oversized content, then derives MIME and SHA-256."],
+            ["find_by_content_hash()", "Returns a matching non-deleted version when one already exists."]
+          ],
+          technologies: [["Browser File API", "Drag/drop and multipart transfer."], ["FastAPI UploadFile", "Typed upload boundary."], ["SHA-256", "Content identity for duplicate detection and storage keys."], ["Pydantic settings", "Centralized upload limit configuration."]],
+          files: [["web/app.js", "uploadFiles"], ["src/rag/api/app.py", "upload_document"], ["src/rag/blob_store.py", "safe_filename"], ["src/rag/ingestion/parsers/registry.py", "SUPPORTED_EXTENSIONS"], ["src/rag/config.py", "max_upload_bytes"]],
+          guardrails: ["The client filename is never used as a storage path.", "Empty and oversized uploads fail before storage.", "Ordinary repeat uploads are detected before another object is written, but concurrent duplicates are not database-enforced.", "Unsupported filename extensions return an explicit 415 response; content-signature validation is not implemented."],
+          terms: [["Multipart", "The common browser format for sending a file plus form fields."], ["SHA-256", "A stable fingerprint calculated from all file bytes."], ["Best-effort deduplication", "A normal repeat is reused, while a simultaneous race can still create two records."]],
+          actors: ["upload-ui", "api"]
+        },
+        {
+          phase: "INGEST 02",
+          group: "01 / INGESTION",
+          nav: "Store and register",
+          title: "Preserve the original and create its ledger",
+          summary: "The bytes go to object storage while PostgreSQL records a document, immutable version, and ingestion job.",
+          plainTitle: "Keep the original, then issue tracking numbers",
+          plain: "The complete file is placed in a durable cabinet. The database stores a card saying what the file is, where it lives, which version it is, and which background job will process it. The user immediately receives IDs that can be checked later.",
+          technicalTitle: "Content-addressed blob plus transactional relational metadata",
+          technical: "The API writes the bytes through BlobStore.put_bytes() under default/default/sha256/{prefix}/{hash}. DocumentRepository.register_upload() creates Document, DocumentVersion, and IngestionJob rows. The version stores blob URI, hash, MIME type, byte size, pipeline identity, and embedding configuration; the API commits QUEUED/PROCESSING state before dispatch.",
+          input: ["Validated bytes and content hash", "Filename, MIME type, byte size", "Default tenant and collection"],
+          operation: ["Write immutable object", "Create document and version rows", "Create PENDING ingestion job", "Commit lifecycle state"],
+          output: ["s3:// MinIO/S3 URI or local:// URI", "document_id + version_id + job_id", "202 Accepted response"],
+          trace: [["create_blob_store(settings)", "Selects MinIO/S3 or local disk adapter."], ["BlobStore.put_bytes()", "Writes the original under a content-addressed key."], ["DocumentRepository.register_upload()", "Creates the relational lifecycle records."], ["session.commit()", "Makes the file ledger durable before queuing work."], ["UploadAccepted", "Returns stable identifiers and QUEUED status."]],
+          technologies: [["MinIO", "Local S3-compatible immutable file storage."], ["boto3", "S3 protocol client used by the blob adapter."], ["PostgreSQL", "Transactional source-of-truth for metadata and lifecycle."], ["SQLAlchemy", "Entity mapping and repository transactions."]],
+          files: [["src/rag/blob_store.py", "S3BlobStore · LocalBlobStore · create_blob_store"], ["src/rag/repositories.py", "DocumentRepository.register_upload"], ["src/rag/models.py", "Document · DocumentVersion · IngestionJob"], ["src/rag/api/schemas.py", "UploadAccepted"]],
+          guardrails: ["Database registration happens only after the blob write succeeds.", "A registration failure removes an unshared blob.", "Original bytes are retained for audits, exact counts, and future re-indexing.", "Versions record which embedding provider/model created the index."],
+          terms: [["Object storage", "A durable cabinet addressed by keys rather than folders users control."], ["Version", "An immutable record of one exact set of source bytes."], ["Transaction", "A group of database changes that either all succeed or all roll back."]],
+          actors: ["api", "blob", "database"]
+        },
+        {
+          phase: "INGEST 03",
+          group: "01 / INGESTION",
+          nav: "Queue background work",
+          title: "Move slow indexing out of the web request",
+          summary: "FastAPI responds quickly; Redis delivers a job that a separate Celery worker can process independently.",
+          plainTitle: "Hand the long job to the back room",
+          plain: "Reading a PDF and creating hundreds of vectors can take time. The receptionist does not make the user wait at the counter. It places a job ticket in a queue, and a worker picks it up. The browser polls the document status until it becomes READY.",
+          technicalTitle: "Redis-backed Celery task boundary",
+          technical: "After commit, upload_document() calls ingest_document.delay(version_id). Redis is both broker and result backend. Celery enables late acknowledgements, prefetch 1, tracked starts, and broker-connection retry at worker startup. The worker opens its own SQLAlchemy session and commits stage transitions through TransactionalIngestionRepository. Parsed blocks, chunks, and embedding batches are not checkpoint-resumable, and task autoretry/backoff is not implemented.",
+          input: ["Committed version_id", "PENDING ingestion job", "Redis broker URL"],
+          operation: ["Serialize a task message", "Deliver it through Redis", "Execute in Celery worker", "Persist stage transitions"],
+          output: ["Independent ingestion attempt", "Visible status progression", "API remains responsive"],
+          trace: [["ingest_document.delay(version_id)", "Publishes the job after database commit."], ["Redis broker", "Buffers and delivers task messages."], ["ingest_document(version_id)", "Celery task creates providers and the ingestion service."], ["TransactionalIngestionRepository", "Commits each stage and rolls back failed statements."], ["loadDocuments()", "Browser polls and updates progress every 2.2 seconds."]],
+          technologies: [["Celery", "Distributed background task execution."], ["Redis", "Task broker and result backend."], ["SQLAlchemy sessions", "Worker-owned transactional database lifetime."], ["Docker Compose", "Runs API and worker as separate processes."]],
+          files: [["src/rag/api/app.py", "upload_document · ingest_document.delay"], ["src/rag/worker/celery_app.py", "celery_app · ingest_document · TransactionalIngestionRepository"], ["web/app.js", "loadDocuments · renderDocuments"], ["compose.yaml", "redis · worker"]],
+          guardrails: ["The task is queued only after metadata commits.", "Partial work is not searchable while status is PROCESSING.", "Late acknowledgements reduce task loss if a worker stops, but do not add automatic retry/backoff.", "Queue failures are stored as a user-visible ingestion failure."],
+          terms: [["Queue", "A waiting line of jobs that can be processed separately."], ["Broker", "The service that transports queued job messages."], ["Worker", "A background process dedicated to slow tasks."]],
+          actors: ["api", "queue", "worker", "question-ui"]
+        },
+        {
+          phase: "INGEST 04",
+          group: "01 / INGESTION",
+          nav: "Parse and normalize",
+          title: "Turn each file format into one common language",
+          summary: "Format-specific parsers emit ordered blocks with text, type, page, section, and source location; normalization cleans without flattening structure.",
+          plainTitle: "Read different file types into labeled building blocks",
+          plain: "PDFs, Word files, and Markdown look different internally. Each specialist reader turns them into the same kind of notes: this is a heading, this is a paragraph, this came from page two, and this belongs under a certain section. A cleanup pass fixes messy spacing while preserving meaning.",
+          technicalTitle: "Parser adapters produce provenance-rich Block records",
+          technical: "ParserRegistry selects by final extension. PDFParser uses PyMuPDF text blocks and bounding boxes; DocxParser preserves paragraph/table order through python-docx; MarkdownParser and TextParser are deterministic scanners; HTMLParser uses the standard library and ignores script/style content. Normalizer performs NFC Unicode cleanup, line-wrap repair, layout preservation, and repeated-margin suppression.",
+          input: ["Raw immutable bytes", "Original filename", "Parser selected by suffix"],
+          operation: ["Extract ordered structural blocks", "Attach page/line/bounding-box provenance", "Normalize Unicode and whitespace", "Remove repeated PDF margins"],
+          output: ["Block(kind, text, order)", "page + section_path", "source_locator metadata"],
+          trace: [["ParserRegistry.parse()", "Chooses the adapter for the source suffix."], ["PDFParser / DocxParser / ... .parse()", "Converts bytes into ordered Block values."], ["Normalizer.normalize()", "Cleans each block while preserving code, lists, and tables."], ["_remove_repeated_page_margins()", "Suppresses short headers/footers repeated on at least 60% of 3+ pages."]],
+          technologies: [["PyMuPDF", "Text-layer PDF blocks, pages, and bounding boxes."], ["python-docx", "Word paragraphs, styles, lists, and tables."], ["Python HTMLParser", "Dependency-free structural HTML extraction."], ["Unicode normalization", "Stable text representation across encodings."]],
+          files: [["src/rag/ingestion/parsers/registry.py", "ParserRegistry"], ["src/rag/ingestion/parsers/pdf.py", "PDFParser"], ["src/rag/ingestion/parsers/docx.py", "DocxParser"], ["src/rag/ingestion/parsers/markdown.py", "MarkdownParser"], ["src/rag/ingestion/parsers/html.py", "HTMLParser"], ["src/rag/ingestion/normalization.py", "Normalizer · normalize_text"]],
+          guardrails: ["Scanned/image-only PDFs become NEEDS_OCR instead of silently indexing nothing.", "Script, style, noscript, and SVG HTML content is ignored.", "Tables, lists, and code keep line layout.", "Page and section metadata reach answer citations when available; detailed bounding boxes and source-line locators remain internal."],
+          terms: [["Parser", "A reader specialized for one file format."], ["Block", "A meaningful source unit such as a heading, paragraph, list, table, or code section."], ["Provenance", "The recorded origin of text: page, line, section, or bounding box."], ["OCR", "Technology that reads text from scanned page images; it is not implemented yet."]],
+          actors: ["worker", "blob", "parser"]
+        },
+        {
+          phase: "INGEST 05",
+          group: "01 / INGESTION",
+          nav: "Create useful chunks",
+          title: "Split knowledge without losing its neighborhood",
+          summary: "Blocks become bounded, overlapping chunks that preserve section and page provenance and receive deterministic identities.",
+          plainTitle: "Cut the book into passages that still make sense",
+          plain: "A whole document is too large to compare with every question. The app cuts it into passages, but it respects headings, paragraphs, lists, tables, and code. A small overlap keeps ideas from being broken exactly at a boundary. Each passage remembers where it came from.",
+          technicalTitle: "Structure-first, token-bounded deterministic chunking",
+          technical: "Chunker groups blocks by section_path, splits oversized prose on sentences and structured blocks on lines, packs toward 500 approximate tokens, enforces a hard 750-token ceiling, prefers at least 100 tokens, and carries a 75-token tail overlap. deterministic_chunk_id(version, ordinal, content_hash) makes retries stable. Display text stays clean while embedding_text prepends document and section context.",
+          input: ["Normalized ordered Block list", "version_id and document title", "500 / 750 / 100 / 75 token settings"],
+          operation: ["Group by section", "Split oversized blocks", "Pack to token target", "Add safe overlap and provenance", "Hash and identify each chunk"],
+          output: ["Canonical chunk text", "Context-enriched embedding_text", "Stable ID + ordinal + source metadata"],
+          trace: [["Chunker.chunk()", "Coordinates grouping, splitting, packing, and construction."], ["_split_block()", "Uses sentence or line boundaries before hard splitting."], ["_pack_group()", "Fills target-sized chunks without mixing unrelated sections."], ["_overlap_tail()", "Copies up to 75 tokens of prior context."], ["deterministic_chunk_id()", "Produces a repeatable UUID from version, ordinal, and content hash."]],
+          technologies: [["Dataclasses", "Provider-neutral Block and Chunk value objects."], ["Deterministic UUID5", "Stable retry-safe chunk identity."], ["Token approximation", "Dependency-free word/punctuation counter for hard limits."], ["SHA-256", "Exact chunk-content identity."]],
+          files: [["src/rag/ingestion/chunking.py", "Chunker · approximate_token_count"], ["src/rag/ingestion/identifiers.py", "content_hash · deterministic_chunk_id"], ["src/rag/ingestion/models.py", "Block · Chunk"], ["src/rag/config.py", "chunk_* settings"]],
+          guardrails: ["Chunks stay within the 750-token maximum according to the configured approximate counter; the provider tokenizer can count differently.", "Unrelated sections are not merged just to fill space.", "The original clean text and embedding-enriched text remain separate.", "Overlapped text retains its original source locator, but persisted provenance does not explicitly mark which text was copied as overlap."],
+          terms: [["Chunk", "A small, searchable passage cut from a document."], ["Token", "A model-sized piece of text; roughly a word or part of a word."], ["Overlap", "A little repeated context on both sides of a cut."], ["Deterministic", "The same inputs always produce the same identifier."]],
+          actors: ["worker", "chunker"]
+        },
+        {
+          phase: "INGEST 06",
+          group: "01 / INGESTION",
+          nav: "Embed, index, publish",
+          title: "Translate meaning into vectors, then publish atomically",
+          summary: "Chunks are embedded in bounded batches, stored beside lexical indexes, validated, and exposed only when the entire version is complete.",
+          plainTitle: "Give every passage coordinates on a map of meaning",
+          plain: "The embedding model turns each passage into 1,536 numbers. Passages with similar meaning land near each other, even if they use different words. The database stores those coordinates plus a keyword index. The new shelf stays hidden until every passage and vector is present, then becomes READY in one switch.",
+          technicalTitle: "OpenAI embeddings + pgvector HNSW + atomic version publish",
+          technical: "IngestionService batches at most 64 chunks and 16,000 estimated tokens. OpenAIEmbeddingProvider calls embeddings.create(model=text-embedding-3-small, dimensions=1536), then validates count, shape, and finite floats. ChunkRepository replaces rows and persists Vector(1536); PostgreSQL computes tsvector. publish_version() verifies expected vs actual vs embedded counts and atomically sets current_version_id and READY.",
+          input: ["Chunk embedding_text values", "OpenAI API key and model configuration", "Hidden document version"],
+          operation: ["Batch and call embedding provider", "Validate every numeric vector", "Replace chunks and store vectors", "Verify counts and atomically publish"],
+          output: ["1,536-dimensional embeddings", "HNSW and GIN searchable indexes", "Current READY document version"],
+          trace: [["IngestionService._embedding_batches()", "Respects both item and token ceilings."], ["OpenAIEmbeddingProvider.embed_texts()", "Calls the external embedding endpoint in ordered batches."], ["ChunkRepository.replace_for_version()", "Replaces retry output without accumulating duplicates."], ["ChunkRepository.save_embeddings()", "Rejects wrong dimensions and non-finite values."], ["IngestionRepository.publish_version()", "Validates completeness and exposes the version atomically."]],
+          technologies: [["text-embedding-3-small", "Creates semantic vectors; replaceable via EmbeddingProvider."], ["pgvector Vector(1536)", "Stores and compares embeddings in PostgreSQL."], ["HNSW cosine index", "Approximate nearest-neighbor acceleration with m=16, ef_construction=64."], ["PostgreSQL tsvector + GIN", "Generated English full-text index for keyword retrieval."], ["Alembic", "Creates and versions the relational/vector schema."]],
+          files: [["src/rag/ingestion/service.py", "_embed · _embedding_batches"], ["src/rag/adapters/openai_models.py", "OpenAIEmbeddingProvider"], ["src/rag/repositories.py", "replace_for_version · save_embeddings · publish_version"], ["src/rag/models.py", "Chunk.embedding · Document.current_version_id"], ["migrations/versions/0001_initial.py", "vector extension · HNSW · GIN indexes"]],
+          guardrails: ["Vector count, 1,536 dimensions, and finite numeric values are validated.", "A failed or partial version never becomes searchable.", "Retrieval filters current_version_id and READY status inside SQL.", "OpenAI embedding batches are metered API calls when that provider is selected.", "Provider/model identity is recorded but not enforced at query time; changing models requires deleting and re-indexing every document."],
+          terms: [["Embedding", "A list of numbers representing the meaning of text."], ["Vector", "The numerical coordinate produced by an embedding model."], ["Cosine distance", "A measure of how similarly two vectors point."], ["Atomic publish", "The whole index becomes visible at once—or not at all."], ["HNSW", "A graph index that finds nearby vectors quickly."]],
+          actors: ["worker", "embed", "database"]
+        },
+        {
+          phase: "RETRIEVE 01",
+          group: "02 / RETRIEVAL",
+          nav: "Ask and choose a route",
+          title: "Receive the question and decide what kind of answer it needs",
+          summary: "The browser sends the question and recent conversation; the API applies scope and separates exact aggregation from semantic Q&A.",
+          plainTitle: "First decide whether this is search or arithmetic",
+          plain: "Most questions need the best passages and an explanation. But a question like ‘How many times is ISTQB written?’ needs a complete count, not the few passages search happens to return. The app recognizes that special request and sends it down a different, exact path.",
+          technicalTitle: "Typed answer boundary with deterministic intent routing",
+          technical: "askQuestion() posts the question plus up to five prior messages to /api/answers. AnswerRequest accepts at most ten history items and validates length and whitespace; RetrievalService keeps at most the last six. _retrieval_filters() applies the default tenant, collection, and optional document IDs. parse_exact_count_request() detects unambiguous count intent with quoted or explicit terms. All other questions call RetrievalService.answer().",
+          input: ["Question text", "Up to five prior messages from the browser", "Collection/document scope"],
+          operation: ["Validate the request", "Build mandatory retrieval filters", "Recognize exact-count intent", "Choose deterministic or semantic path"],
+          output: ["ExactCountRequest", "or normalized semantic question", "Scoped retrieval filters"],
+          trace: [["askQuestion(question)", "Adds the user message and posts JSON."], ["AnswerRequest", "Validates question, history, and filter sizes."], ["answer_question(request)", "Owns route selection and response translation."], ["_retrieval_filters()", "Requires valid document UUIDs and the default tenant."], ["parse_exact_count_request()", "Returns a count request only for unambiguous phrasing."]],
+          technologies: [["Fetch API", "Browser-to-FastAPI JSON request."], ["Pydantic", "Boundary validation and typed response shapes."], ["Regular expressions", "Transparent exact-count intent detection."], ["FastAPI", "Async route for semantic model calls."]],
+          files: [["web/app.js", "askQuestion"], ["src/rag/api/schemas.py", "AnswerRequest · HistoryMessage"], ["src/rag/api/app.py", "answer_question · _retrieval_filters"], ["src/rag/retrieval/exact_count.py", "parse_exact_count_request"]],
+          guardrails: ["Questions cannot be blank and have explicit size limits.", "Tenant scope is mandatory and applied before ranking.", "Conversation helps interpret the question but is not treated as factual evidence.", "Aggregation is not incorrectly delegated to top-k semantic retrieval."],
+          terms: [["Intent routing", "Choosing the right procedure based on what the question asks."], ["Scope", "The documents and tenant the search is allowed to inspect."], ["Aggregation", "A calculation over the complete collection, such as counting every occurrence."]],
+          actors: ["question-ui", "api", "router"]
+        },
+        {
+          phase: "RETRIEVE 02A",
+          group: "02 / RETRIEVAL",
+          nav: "Exact-count branch",
+          title: "Count every occurrence in supported parsed text",
+          summary: "Explicit word and phrase counts re-read every selected original and count every normalized block produced by its parser exactly once.",
+          plainTitle: "Open every selected book and count with a ruler",
+          plain: "Search normally shows only the best few passages, and chunk overlap can repeat the same sentence. For an exact count, the app bypasses semantic search, reopens each original file, and counts across every normalized text block its parser can read. The language model is not involved. Images, scans without OCR, ignored HTML regions, and repeated PDF margins removed during cleanup are outside that count.",
+          technicalTitle: "Whole-source deterministic aggregation bypass",
+          technical: "_answer_exact_count() lists current READY versions, reads each blob, reparses and normalizes it, and builds CountableDocument values. count_exact_occurrences() applies an escaped whole-word or literal-phrase regex to non-overlapping parser blocks. Evidence is capped and round-robined across documents, then returned with deterministic source IDs and match_count metadata.",
+          input: ["ExactCountRequest(term, case_sensitive)", "All scoped READY original blobs", "Non-overlapping normalized blocks"],
+          operation: ["Reparse originals into supported text blocks", "Compile safe literal matching pattern", "Count each normalized source block once", "Build page/section evidence"],
+          output: ["Exact total within parsed normalized text", "Per-document breakdown and evidence", "Zero embedding and generation-model calls"],
+          trace: [["_answer_exact_count()", "Loads all current source versions and original bytes."], ["ParserRegistry.parse()", "Reconstructs the text blocks supported by each parser."], ["count_exact_occurrences()", "Counts every match in those blocks and accumulates per-document totals."], ["format_exact_count_answer()", "Creates the human-readable audited result."], ["AnswerResponse", "Marks provider as deterministic-exact-count."]],
+          technologies: [["Python re", "Escaped, case-aware whole-word or phrase matching."], ["BlobStore", "Reads authoritative original files rather than overlapping chunks."], ["UUID5", "Stable evidence identifiers for exact-count source cards."], ["Existing parsers", "Uses the same normalization rules as ingestion."]],
+          files: [["src/rag/api/app.py", "_answer_exact_count"], ["src/rag/retrieval/exact_count.py", "ExactCountRequest · count_exact_occurrences · format_exact_count_answer"], ["src/rag/repositories.py", "list_ready_versions"], ["web/app.js", "match_count evidence rendering"]],
+          guardrails: ["Chunk overlap cannot double-count occurrences because chunks are bypassed.", "Top-k retrieval cannot miss occurrences that exist in parser-produced text.", "The target is regex-escaped, preventing pattern injection.", "Only current READY and scoped documents are inspected.", "No model API call is made, but unreadable images/OCR and parser-omitted regions cannot be counted."],
+          terms: [["Deterministic", "No model judgment: the same source and term produce the same total."], ["Whole-word", "ISTQB matches ISTQB, but not a longer word containing those letters."], ["Bypass", "A deliberately separate path for a job semantic retrieval cannot do reliably."]],
+          actors: ["router", "count", "blob", "parser", "answer-ui"]
+        },
+        {
+          phase: "RETRIEVE 02B",
+          group: "02 / RETRIEVAL",
+          nav: "Hybrid candidate search",
+          title: "Search by meaning and exact words for the same question",
+          summary: "The normalized question becomes a query vector, then PostgreSQL runs both dense cosine and lexical full-text searches as one hybrid retrieval step.",
+          plainTitle: "Use two detectives with different strengths",
+          plain: "One detective finds passages that mean the same thing even when the wording differs. The other is excellent with exact names, acronyms, dates, and codes. The app uses both candidate lists instead of betting everything on one method. In the current build, the two database queries run one after the other, which affects speed but not the hybrid result.",
+          technicalTitle: "Hybrid dense and PostgreSQL full-text retrieval",
+          technical: "RetrievalService.search() NFC-normalizes whitespace and uses the currently configured embedding provider. asyncio.gather orchestrates ChunkRepository.dense_search() and lexical_search() and collects per-channel failures, but their current synchronous SQLAlchemy calls execute sequentially on the event loop; true database concurrency needs async SQLAlchemy or thread offload. Dense SQL orders pgvector cosine distance; lexical SQL builds an OR-style websearch_to_tsquery and ranks the generated tsvector with ts_rank_cd. Both SQL paths prefilter tenant, collection, document IDs, READY status, and current version.",
+          input: ["Normalized question", "1,536-dimensional query embedding", "Required RetrievalFilters"],
+          operation: ["Embed question", "Dense cosine top 40", "Lexical full-text top 40", "Retain provenance and raw scores"],
+          output: ["Dense SearchCandidate list", "Lexical SearchCandidate list", "Timing and channel diagnostics"],
+          trace: [["normalize_query()", "NFC-normalizes and collapses whitespace."], ["embedder.embed_query()", "Creates a vector with the current provider; stored-index compatibility is assumed."], ["asyncio.gather()", "Starts both channel wrappers and collects failures; sync SQL still executes sequentially."], ["ChunkRepository.dense_candidates()", "Orders by pgvector cosine distance."], ["ChunkRepository.lexical_candidates()", "Uses tsvector matching and ts_rank_cd."], ["POST /api/retrieval/search", "Exposes retrieval diagnostics without answer generation; semantic use still embeds the query."]],
+          technologies: [["OpenAI embeddings", "Semantic representation of the question when the OpenAI provider is selected."], ["pgvector cosine search", "Meaning-based nearest-neighbor retrieval."], ["PostgreSQL full-text search", "Exact-token and linguistic keyword retrieval."], ["asyncio", "Unified, failure-aware channel orchestration; not true DB concurrency here."]],
+          files: [["src/rag/retrieval/service.py", "normalize_query · RetrievalService.search"], ["src/rag/repositories.py", "_retrieval_statement · dense_candidates · lexical_candidates"], ["src/rag/adapters/openai_models.py", "OpenAIEmbeddingProvider.embed_query"], ["src/rag/api/app.py", "search_documents"], ["src/rag/retrieval/models.py", "RetrievalFilters · SearchCandidate"]],
+          guardrails: ["The database enforces 1,536 dimensions, but does not compare the configured provider/model with version metadata; model changes require manual re-indexing.", "Tenant/collection/document scope and READY/current-version filters are applied inside SQL before LIMIT; per-user ACL enforcement is not implemented.", "If one retrieval channel fails, the other may still produce candidates.", "Both failing raises a RetrievalError instead of inventing results.", "With OpenAI selected, each semantic question—including /api/retrieval/search—uses a metered query-embedding call; the debug route skips generation cost."],
+          terms: [["Semantic search", "Search by meaning rather than only matching words."], ["Dense", "A vector where most positions contain numeric values."], ["Lexical", "Search based on actual words and language rules."], ["Candidate", "A passage that may be useful and still needs ranking."]],
+          actors: ["router", "embed", "database", "retrieve"]
+        },
+        {
+          phase: "RETRIEVE 03",
+          group: "02 / RETRIEVAL",
+          nav: "Fuse, rerank, diversify",
+          title: "Turn two noisy lists into a small evidence set",
+          summary: "Rank fusion combines channels, duplicate removal reduces repetition, reranking checks query overlap, and MMR keeps the final context diverse.",
+          plainTitle: "Merge the detectives' notes and remove echoes",
+          plain: "The app rewards passages found near the top by either search method. It removes copies and near-copies, checks the wording against the question again, and avoids returning eight versions of the same point. The result is a small set that is both relevant and varied.",
+          technicalTitle: "Weighted RRF, local reranking, and maximal marginal relevance",
+          technical: "reciprocal_rank_fusion() combines ranks—not incompatible raw scores—with weights 0.65 dense, 0.35 lexical and k=60, keeping 30. deduplicate_ranked_candidates() removes identical hashes/text and near-duplicates at 0.92 token similarity. TokenOverlapReranker contributes a 0.70-weighted final score. select_diverse_candidates() applies MMR at lambda 0.75, caps three chunks per document and two per section, and selects up to eight.",
+          input: ["Top 40 dense candidates", "Top 40 lexical candidates", "Original normalized question"],
+          operation: ["Reciprocal-rank fusion", "Exact and near-duplicate removal", "Token-overlap reranking", "MMR diversity and source caps"],
+          output: ["Up to eight RankedCandidate values", "Explainable channel/rerank scores", "Diverse document and section coverage"],
+          trace: [["reciprocal_rank_fusion()", "Combines rank positions on a comparable scale."], ["deduplicate_ranked_candidates()", "Keeps the best copy of repeated content."], ["TokenOverlapReranker.rerank()", "Scores overlap of important question and passage terms."], ["attach_rerank_scores()", "Blends fusion and reranker signals."], ["select_diverse_candidates()", "Balances relevance with novelty and source caps."]],
+          technologies: [["RRF", "Robust rank-list fusion without score calibration."], ["Token-set similarity", "Near-duplicate detection."], ["Deterministic reranker", "A cheap, transparent second relevance check."], ["MMR", "Balances high relevance against repeated information."]],
+          files: [["src/rag/retrieval/fusion.py", "reciprocal_rank_fusion · deduplicate_ranked_candidates · attach_rerank_scores"], ["src/rag/adapters/local_models.py", "TokenOverlapReranker"], ["src/rag/retrieval/diversity.py", "select_diverse_candidates · cosine_similarity"], ["src/rag/retrieval/service.py", "RetrievalConfig · search"]],
+          guardrails: ["Raw vector and lexical scores are never incorrectly averaged.", "Stable secondary sort keys make evaluation runs reproducible.", "Optional reranker failure degrades gracefully to fused ranking.", "Document and section caps prevent one source from dominating context."],
+          terms: [["Rerank", "Recheck a smaller result set with an additional relevance rule."], ["RRF", "A method that rewards items appearing high in one or more ranked lists."], ["MMR", "A rule that prefers relevant passages that add new information."], ["Near-duplicate", "Different-looking text that carries almost the same words."]],
+          actors: ["retrieve", "rank"]
+        },
+        {
+          phase: "RETRIEVE 04",
+          group: "02 / RETRIEVAL",
+          nav: "Assemble bounded evidence context",
+          title: "Build the only evidence the answer model may see",
+          summary: "Selected passages are packed into a bounded prompt with request-local [S#] labels, persistent source identities, available page/section data, and an explicit untrusted-data boundary.",
+          plainTitle: "Prepare a numbered evidence packet",
+          plain: "The app gives each chosen passage a label such as S1 or S2 and includes the filename and location. It fits as much strong evidence as possible inside a size budget. The writer is told that document text is reference material, never instructions it should obey.",
+          technicalTitle: "Provenance-rich context packing under a 6,000-token budget",
+          technical: "ContextBuilder.build() assigns sequential source IDs and serializes file, document ID, version ID, chunk ID, page/section, and content between [S#] markers. estimate_tokens() enforces a separate 6,000-token evidence ceiling. Oversized passages are truncated at useful boundaries; SourceExcerpt records whether truncation occurred. Only passages actually packed become allowed source IDs.",
+          input: ["Up to eight ranked candidates", "Page and section provenance", "6,000-token evidence budget"],
+          operation: ["Label S1…Sn for this request", "Add persistent identifiers and locations", "Pack in MMR-selected order", "Truncate safely when required"],
+          output: ["ContextBundle.text", "Exact SourceExcerpt tuple", "Allowed citation label set"],
+          trace: [["ContextBuilder.build()", "Iterates candidates in the order chosen by MMR diversity selection."], ["_location()", "Formats page ranges and heading breadcrumbs."], ["estimate_tokens()", "Tracks the complete context size."], ["_truncate_to_budget()", "Cuts a passage only when the remaining budget requires it."], ["GenerationRequest.allowed_source_ids", "Derives the request-local labels the model may cite."]],
+          technologies: [["Prompt budgeting", "Bounds latency and generation input cost."], ["Persistent source IDs", "Tie an answer back to immutable document, version, and chunk UUIDs; S-labels themselves are request-local."], ["Dataclasses", "ContextBundle and SourceExcerpt keep the core provider-neutral."], ["Untrusted-data instruction", "Labels source content as reference data rather than commands."]],
+          files: [["src/rag/retrieval/context.py", "ContextBuilder · ContextBundle · estimate_tokens"], ["src/rag/retrieval/models.py", "SourceExcerpt · GenerationRequest"], ["src/rag/retrieval/service.py", "RetrievalService.answer"]],
+          guardrails: ["Only selected evidence enters the generation prompt.", "Source labels are created by the server, not the model or documents.", "Every passage carries immutable document/version/chunk identity and page/section data when available.", "Source text is marked untrusted and the model is instructed not to follow it; this reduces risk but is not complete prompt-injection protection."],
+          terms: [["Context", "The evidence packet supplied to the answer model."], ["Budget", "The maximum amount of evidence allowed in one request."], ["Prompt injection", "Malicious text inside a document that tries to command the model."], ["Source label", "A server-created handle such as S1 that points to one exact passage."]],
+          actors: ["rank", "context"]
+        },
+        {
+          phase: "RETRIEVE 05",
+          group: "02 / RETRIEVAL",
+          nav: "Generate from evidence",
+          title: "Ask the LLM to write—not to search",
+          summary: "The generation adapter receives the question, limited conversation, and selected evidence and must return a strict, evidence-oriented JSON shape.",
+          plainTitle: "The writer gets a closed-book assignment",
+          plain: "The model does not browse your storage and does not decide which pages matter. Your code already selected the evidence. The model's job is only to turn that packet into a clear answer, cite the supplied labels, or admit that the packet is insufficient.",
+          technicalTitle: "OpenAI Responses API with strict structured output",
+          technical: "OpenAIResponsesGenerator.generate() calls responses.create with gpt-5.6-luna, reasoning effort none, store=false, a system grounding instruction, and a strict JSON Schema. The schema requires answer, cited_source_ids, confidence, missing_information, and abstained. _generation_input() keeps conversation separate from evidence and includes correction feedback on a retry.",
+          input: ["Normalized question", "Recent conversation for interpretation", "Labelled ContextBundle", "Allowed [S#] values"],
+          operation: ["Construct grounded prompt", "Request strict JSON", "Generate with reasoning=none", "Parse and validate response types"],
+          output: ["GenerationResult", "Answer text + declared citations", "Confidence, missing information, abstention flag"],
+          trace: [["create_generator(settings)", "Selects OpenAI or the local extractive adapter."], ["_generation_input(request)", "Serializes question, evidence, history, and any correction."], ["responses.create()", "Runs the configured OpenAI generation model."], ["_parse_json_output()", "Rejects malformed or non-object JSON."], ["GenerationResult", "Returns a provider-neutral answer object."]],
+          technologies: [["OpenAI Responses API", "Structured, evidence-constrained text generation."], ["gpt-5.6-luna", "Cost-sensitive answer model selected for this project."], ["JSON Schema", "Machine-checkable output contract."], ["Provider interface", "Allows local extraction or another LLM later."]],
+          files: [["src/rag/adapters/openai_models.py", "OpenAIResponsesGenerator · _ANSWER_FORMAT · _generation_input"], ["src/rag/providers.py", "create_generator"], ["src/rag/adapters/local_models.py", "ExtractiveGenerator fallback"], ["src/rag/retrieval/models.py", "GenerationRequest · GenerationResult"]],
+          guardrails: ["store=false requests that OpenAI not store the response object for later API retrieval.", "The model receives no database or blob-store credentials.", "The prompt instructs the model not to follow commands inside evidence; this is a mitigation, not a deterministic guarantee.", "Strict output types are verified before use.", "With OpenAI selected, each generated answer—and one optional citation-correction retry—is metered API usage."],
+          terms: [["LLM", "A language model used here as a constrained answer writer."], ["Structured output", "A response forced into named JSON fields instead of free-form text."], ["Abstain", "Say there is not enough evidence instead of guessing."], ["Reasoning effort", "Extra internal model work; set to none here for a simple evidence-writing task."]],
+          actors: ["context", "generate"]
+        },
+        {
+          phase: "RETRIEVE 06",
+          group: "02 / RETRIEVAL",
+          nav: "Validate and show sources",
+          title: "Validate source labels before showing the answer",
+          summary: "Server-side validation rejects invented source labels, may retry once with correction feedback, and returns the answer beside the exact evidence cards.",
+          plainTitle: "Check that every footnote points to a supplied passage",
+          plain: "The app compares every S-number in the answer with the evidence packet it actually supplied. A made-up label fails, and an answer that does not abstain needs at least one inline citation. The model gets one correction attempt for bad labels. This proves that the footnote exists; it does not prove that every sentence is supported by that footnote.",
+          technicalTitle: "Source-label allow-list validation and controlled abstention",
+          technical: "validate_citations() extracts inline [S#] labels and declared IDs, normalizes them, and compares them with GenerationRequest.allowed_source_ids. Non-abstaining answers require at least one valid inline citation. RetrievalService retries at most once with _validation_feedback(); persistent invalid or missing labels produce an abstention. It does not perform claim-level entailment or faithfulness scoring. AnswerResponse returns source excerpts and diagnostics; appendMessage() renders expandable evidence with relevance and locations.",
+          input: ["GenerationResult", "Server-created allowed source IDs", "Exact SourceExcerpt tuple"],
+          operation: ["Extract and normalize citations", "Reject labels outside allow-list", "Retry once if configured", "Translate to public API and evidence cards"],
+          output: ["Answer with allow-listed source references", "or abstention after invalid/missing labels", "Inspectable evidence and diagnostics"],
+          trace: [["validate_citations()", "Checks inline and declared source labels."], ["_validation_feedback()", "Explains exactly what the retry must fix."], ["_answer_from_generation()", "Builds an AnswerResult after source-label checks pass."], ["_abstention()", "Returns a safe fallback after a generation error or persistent citation-format failure."], ["appendMessage()", "Shows answer, source text, page/section, and relevance in the browser."]],
+          technologies: [["Server-side regex validation", "Finds visible inline source labels."], ["Pydantic AnswerResponse", "Stable public response contract."], ["Native details/summary", "Accessible expandable evidence cards."], ["Retrieval diagnostics", "Candidate counts, context size, warnings, and abstention state."]],
+          files: [["src/rag/retrieval/citations.py", "validate_citations · CitationValidation"], ["src/rag/retrieval/service.py", "_validation_feedback · _answer_from_generation · _abstention"], ["src/rag/api/app.py", "AnswerResponse translation"], ["src/rag/api/schemas.py", "SourceResponse · AnswerDiagnostics · AnswerResponse"], ["web/app.js", "appendMessage"]],
+          guardrails: ["A structured citation list alone is not enough; the visible answer needs an inline citation.", "The model cannot authorize a source label that the server did not create.", "Generation errors become abstentions with retained evidence, not fabricated answers.", "Claim-level faithfulness or entailment checking is not implemented and remains evaluation roadmap work.", "The UI uses textContent for model and document text, preventing HTML execution."],
+          terms: [["Allow-list", "A short list of values that are accepted; everything else is rejected."], ["Citation validation", "Checking that answer footnote labels refer to passages the server supplied—not proving the prose is true."], ["Entailment", "Checking whether the cited passage actually supports a specific claim; this is not implemented."], ["Diagnostics", "Debug information about search, ranking, context, and failure decisions."]],
+          actors: ["generate", "validate", "api", "answer-ui"]
+        },
+        {
+          phase: "OPERATE",
+          status: "IMPLEMENTED + ROADMAP",
+          group: "03 / OPERATIONS",
+          nav: "Run, delete, test, evolve",
+          title: "Operate the local MVP—and know what remains",
+          summary: "Docker Compose runs six roles, health checks cover local dependencies, deletion hides data first, and tests protect deterministic core behavior.",
+          plainTitle: "A working workshop with labeled emergency exits",
+          plain: "The application is not only an answer screen. It has separate services for files, records, queues, workers, and models; it reports database, queue, and file-store health, but does not probe the external model or credits. Deleting a document immediately removes it from search before cleaning its file and passages. The project also marks features still needed before serving real users.",
+          technicalTitle: "Containerized runtime, lifecycle safety, and explicit production gaps",
+          technical: "compose.yaml orchestrates postgres, redis, minio, migrate, api, and worker with health/dependency gates and persistent volumes. /api/health checks SQL, Redis, and blob access. DELETE marks the document DELETING with current_version_id cleared before removing blobs and chunks, then leaves a tombstone. Unit tests cover parsers, chunking, orchestration, ranking, citations, exact counts, and adapters; smoke_test.py exercises the live stack. Authentication, malware isolation, OCR, backups, traces, retries, evaluation, and quotas remain roadmap work.",
+          input: ["Environment settings and Docker images", "Health and lifecycle requests", "Unit and live-stack test cases"],
+          operation: ["Migrate schema before app start", "Monitor DB/queue/blob dependencies", "Hide then delete source data", "Run deterministic and end-to-end checks"],
+          output: ["Reproducible local runtime", "Recorded failure information", "No searchable deleted content", "Clear production-hardening roadmap"],
+          trace: [["docker compose up --build", "Starts infrastructure, migration, API, and worker roles."], ["alembic upgrade head", "Creates the PostgreSQL and pgvector schema."], ["health()", "Checks database, queue, and blob store."], ["delete_document()", "Marks hidden, removes blob/chunks, and completes soft deletion."], ["pytest / scripts/smoke_test.py", "Validate pure components and the running integration."]],
+          technologies: [["Docker Compose", "Repeatable local multi-service environment."], ["Alembic", "Version-controlled schema migration."], ["Health checks", "Startup ordering and dependency visibility."], ["pytest + Ruff", "Behavior checks and code-quality checks."], ["Persistent volumes", "Keep PostgreSQL, Redis, and MinIO data across container replacement."]],
+          files: [["compose.yaml", "service topology · dependencies · volumes"], ["Dockerfile", "Python 3.12 non-root runtime image"], ["src/rag/api/app.py", "health · delete_document"], ["src/rag/config.py", "Settings and provider/runtime knobs"], ["tests/unit/", "44 deterministic tests"], ["scripts/smoke_test.py", "live upload → answer → count → abstain → cleanup"]],
+          guardrails: ["Deletion clears current_version_id before physical cleanup, making retrieval stop immediately.", "Secrets stay in ignored .env configuration, never browser JavaScript.", "Single-user/local does not mean authenticated or safe for network exposure; do not expose this Compose stack to untrusted users.", "The current build uses one default tenant; real authentication and ACL enforcement are required before multi-user exposure.", "API credits, retries/backoff, monitoring, backups, malware scanning, and evaluation gates are explicit next steps—not silently assumed complete."],
+          readiness: [
+            ["done", "IMPLEMENTED", "Owned end-to-end RAG", "Upload, parse, chunk, embed, hybrid retrieval, reranking, context assembly, evidence-constrained generation, source-label validation, deletion, and deterministic tests exist in this repository."],
+            ["done", "CONFIGURABLE", "Replaceable model providers", "Embeddings and answer generation are selected through provider factories; local deterministic adapters support development without paid model calls."],
+            ["warning", "IMPORTANT LIMIT", "Health is not an OpenAI billing check", "/api/health verifies PostgreSQL, Redis, and MinIO. Its provider name only reports configuration; it does not prove the API key, model access, or available credits work."],
+            ["warning", "NOT YET", "Real users and permissions", "A default tenant exists and ACL metadata is stored, but authentication, tenant identity, and enforced per-user retrieval filters are not implemented."],
+            ["warning", "NOT YET", "Automatic recovery and reindexing", "There is no general retry/backoff or operator reindex endpoint yet. Provider/model migrations and failed-ingestion recovery need explicit workflows."],
+            ["warning", "NOT YET", "Production protection and evidence quality", "OCR, malware/parser isolation, quotas, backups, distributed traces, offline evaluation runs, and deployment-grade secret/network controls remain roadmap work."],
+            ["warning", "DEVELOPMENT ONLY", "Local infrastructure defaults", "Compose exposes development ports and credentials for convenience. They must be replaced, restricted, and isolated before any internet-facing deployment."],
+            ["done", "SAFE TO EXTEND", "Stable seams for the next iteration", "Provider interfaces, repository classes, typed retrieval models, and API schemas give clear extension points without replacing the whole application."]
+          ],
+          terms: [["Migration", "A repeatable database schema change."], ["Health check", "A small test that proves a dependency can respond."], ["Soft-delete tombstone", "A minimal record that something was deleted, while its content is gone."], ["Production hardening", "Security, reliability, monitoring, and scale work needed beyond a local MVP."]],
+          actors: ["api", "database", "blob", "queue", "worker", "answer-ui"]
+        }
+      ];
+
+      const lanes = [
+        {
+          label: "INGESTION\nFILE → INDEX",
+          nodes: [
+            ["upload-ui", "Browser", "upload", 1], ["api", "FastAPI", "validate", 2],
+            ["blob", "MinIO", "original", 2], ["queue", "Redis", "queue", 3],
+            ["worker", "Celery", "worker", 3], ["parser", "Parsers", "blocks", 4],
+            ["chunker", "Chunker", "passages", 5], ["embed", "Embedding", "vectors", 6],
+            ["database", "Postgres", "READY index", 6]
+          ]
+        },
+        {
+          label: "RETRIEVAL\nQUESTION → ANSWER",
+          nodes: [
+            ["question-ui", "Browser", "question", 7], ["router", "FastAPI", "route", 7],
+            ["count", "Exact scan", "count branch", 8], ["retrieve", "Hybrid search", "candidates", 9],
+            ["rank", "RRF + MMR", "evidence", 10], ["context", "Context", "[S#] packet", 11],
+            ["generate", "Generator", "OpenAI / local", 12], ["validate", "Validator", "source labels", 13],
+            ["answer-ui", "Browser", "answer + sources", 13]
+          ]
+        }
+      ];
+
+      const elements = {
+        navigation: document.querySelector("#stage-navigation"),
+        progressStage: document.querySelector("#progress-stage"),
+        progressTotal: document.querySelector("#progress-total"),
+        progress: document.querySelector(".progress-track"),
+        progressFill: document.querySelector("#progress-fill"),
+        flowMap: document.querySelector("#flow-map"),
+        phase: document.querySelector("#phase-badge"),
+        implementation: document.querySelector("#implementation-badge"),
+        title: document.querySelector("#stage-title"),
+        summary: document.querySelector("#stage-summary"),
+        plainTitle: document.querySelector("#plain-title"),
+        plain: document.querySelector("#plain-copy"),
+        technicalTitle: document.querySelector("#technical-title"),
+        technical: document.querySelector("#technical-copy"),
+        io: document.querySelector("#io-flow"),
+        trace: document.querySelector("#code-trace"),
+        technologies: document.querySelector("#technology-list"),
+        files: document.querySelector("#file-list"),
+        guardrails: document.querySelector("#guardrail-list"),
+        terms: document.querySelector("#term-list"),
+        readinessSection: document.querySelector("#readiness-section"),
+        readiness: document.querySelector("#readiness-grid"),
+        focusContent: document.querySelector("#focus-content"),
+        previous: document.querySelector("#previous-stage"),
+        next: document.querySelector("#next-stage")
+      };
+
+      let currentStage = 0;
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function buildNavigation() {
+        const groups = [...new Set(stages.map((stage) => stage.group))];
+        elements.navigation.innerHTML = groups.map((group) => {
+          const buttons = stages.map((stage, index) => ({ stage, index })).filter((item) => item.stage.group === group).map(({ stage, index }) => `
+            <button class="stage-button" type="button" data-stage="${index}" aria-current="${index === currentStage ? "step" : "false"}">
+              <span class="stage-number">${String(index + 1).padStart(2, "0")}</span>
+              <span class="stage-button-title">${escapeHtml(stage.nav)}</span>
+            </button>`).join("");
+          return `<section class="nav-group"><div class="nav-group-label">${escapeHtml(group)}</div>${buttons}</section>`;
+        }).join("");
+        elements.navigation.querySelectorAll("[data-stage]").forEach((button) => {
+          button.addEventListener("click", () => selectStage(Number(button.dataset.stage), true));
+        });
+      }
+
+      function buildMap() {
+        elements.flowMap.innerHTML = lanes.map((lane) => `
+          <div class="flow-lane">
+            <div class="lane-label">${escapeHtml(lane.label).replace("\n", "<br>")}</div>
+            <div class="lane-nodes">
+              ${lane.nodes.map(([id, title, subtitle, jump], index) => `${index ? '<span class="map-arrow" aria-hidden="true">→</span>' : ""}
+                <button class="map-node" type="button" data-actor="${id}" data-jump="${jump}">
+                  <strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span>
+                </button>`).join("")}
+            </div>
+          </div>`).join("");
+        elements.flowMap.querySelectorAll("[data-jump]").forEach((button) => {
+          button.addEventListener("click", () => selectStage(Number(button.dataset.jump), true));
+        });
+      }
+
+      function list(items) {
+        return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+      }
+
+      function selectStage(index, updateHash = false) {
+        currentStage = Math.max(0, Math.min(stages.length - 1, index));
+        const stage = stages[currentStage];
+        elements.phase.textContent = `${String(currentStage + 1).padStart(2, "0")} / ${stage.phase}`;
+        elements.implementation.textContent = stage.status || "IMPLEMENTED";
+        elements.implementation.dataset.tone = stage.status ? "roadmap" : "done";
+        elements.title.textContent = stage.title;
+        elements.summary.textContent = stage.summary;
+        elements.plainTitle.textContent = stage.plainTitle;
+        elements.plain.textContent = stage.plain;
+        elements.technicalTitle.textContent = stage.technicalTitle;
+        elements.technical.textContent = stage.technical;
+        elements.io.innerHTML = `
+          <div class="io-box"><div class="io-box-label">INPUT</div>${list(stage.input)}</div>
+          <div class="io-arrow" aria-hidden="true">→</div>
+          <div class="io-box operation"><div class="io-box-label">WORK PERFORMED</div>${list(stage.operation)}</div>
+          <div class="io-arrow" aria-hidden="true">→</div>
+          <div class="io-box"><div class="io-box-label">OUTPUT</div>${list(stage.output)}</div>`;
+        elements.trace.innerHTML = stage.trace.map(([symbol, description]) => `<li><div><code>${escapeHtml(symbol)}</code><p>${escapeHtml(description)}</p></div></li>`).join("");
+        elements.technologies.innerHTML = stage.technologies.map(([name, purpose]) => `<div class="tech-item"><strong>${escapeHtml(name)}</strong><p>${escapeHtml(purpose)}</p></div>`).join("");
+        elements.files.innerHTML = stage.files.map(([path, symbols]) => `<div class="file-item"><div class="file-path">${escapeHtml(path)}</div><p class="file-symbols">${escapeHtml(symbols)}</p></div>`).join("");
+        elements.guardrails.innerHTML = stage.guardrails.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+        elements.terms.innerHTML = stage.terms.map(([term, definition]) => `<div><dt>${escapeHtml(term)}</dt><dd>${escapeHtml(definition)}</dd></div>`).join("");
+        elements.readinessSection.hidden = !stage.readiness;
+        elements.readiness.innerHTML = (stage.readiness || []).map(([tone, status, title, description]) => `
+          <article class="readiness-card">
+            <span class="readiness-status" data-tone="${escapeHtml(tone)}">${escapeHtml(status)}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(description)}</p>
+          </article>`).join("");
+
+        const value = currentStage + 1;
+        const percent = (value / stages.length) * 100;
+        elements.progressStage.textContent = `STAGE ${String(value).padStart(2, "0")}`;
+        elements.progressTotal.textContent = `OF ${stages.length}`;
+        elements.progress.setAttribute("aria-valuemax", String(stages.length));
+        elements.progress.setAttribute("aria-valuenow", String(value));
+        elements.progressFill.style.width = `${percent}%`;
+        elements.previous.disabled = currentStage === 0;
+        elements.next.disabled = currentStage === stages.length - 1;
+        elements.next.textContent = currentStage === stages.length - 2 ? "FINAL STAGE →" : "NEXT STAGE →";
+
+        document.querySelectorAll(".stage-button").forEach((button) => {
+          button.setAttribute("aria-current", Number(button.dataset.stage) === currentStage ? "step" : "false");
+        });
+        document.querySelectorAll(".map-node").forEach((node) => {
+          node.classList.toggle("is-active", stage.actors.includes(node.dataset.actor));
+        });
+        if (updateHash) history.replaceState(null, "", `#stage-${value}`);
+      }
+
+      document.querySelectorAll(".view-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          const view = button.dataset.view;
+          elements.focusContent.dataset.view = view;
+          document.querySelectorAll(".view-button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+        });
+      });
+
+      elements.previous.addEventListener("click", () => selectStage(currentStage - 1, true));
+      elements.next.addEventListener("click", () => selectStage(currentStage + 1, true));
+      document.addEventListener("keydown", (event) => {
+        if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+        if (event.key === "ArrowLeft" && currentStage > 0) selectStage(currentStage - 1, true);
+        if (event.key === "ArrowRight" && currentStage < stages.length - 1) selectStage(currentStage + 1, true);
+      });
+
+      const hashMatch = location.hash.match(/^#stage-(\d+)$/);
+      if (hashMatch) currentStage = Math.max(0, Math.min(stages.length - 1, Number(hashMatch[1]) - 1));
+      buildNavigation();
+      buildMap();
+      selectStage(currentStage);
+    </script>
+  </body>
+</html>

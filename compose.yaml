@@ -1,0 +1,124 @@
+name: custom-rag
+
+x-app-environment: &app-environment
+  APP_ENV: development
+  DEBUG: "true"
+  DATABASE_URL: postgresql+psycopg://rag:rag@postgres:5432/rag
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  BLOB_STORE: minio
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-ragminio}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-ragminiosecret}
+  S3_BUCKET: ${S3_BUCKET:-rag-documents}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hash}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-feature-hash-v1}
+  EMBEDDING_DIMENSIONS: "1536"
+  GENERATION_PROVIDER: ${GENERATION_PROVIDER:-extractive}
+  GENERATION_MODEL: ${GENERATION_MODEL:-extractive-v1}
+  GENERATION_REASONING_EFFORT: ${GENERATION_REASONING_EFFORT:-none}
+
+x-app-service: &app-service
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: *app-environment
+  volumes:
+    - .:/app
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: rag
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ragminio}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ragminiosecret}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *app-service
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app-service
+    command: ["uvicorn", "rag.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    <<: *app-service
+    command: ["celery", "-A", "rag.worker.celery_app:celery_app", "worker", "--loglevel=INFO"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

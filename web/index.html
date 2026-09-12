@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A transparent, custom-owned RAG workspace." />
+    <title>Index — ask your documents</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260910-2" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand-row">
+          <a class="brand" href="/" aria-label="Index home">
+            <span class="brand-mark" aria-hidden="true">I</span>
+            <span>INDEX</span>
+          </a>
+          <span class="ownership-pill">YOUR PIPELINE</span>
+        </div>
+
+        <section class="upload-card" aria-labelledby="upload-title">
+          <div class="section-kicker">01 / INGEST</div>
+          <h2 id="upload-title">Add knowledge</h2>
+          <p>PDF, DOCX, Markdown, HTML, or text.</p>
+          <label class="dropzone" id="dropzone" for="file-input">
+            <span class="upload-icon" aria-hidden="true">↑</span>
+            <strong>Drop files here</strong>
+            <span>or click to browse</span>
+            <input id="file-input" type="file" multiple accept=".pdf,.docx,.md,.markdown,.html,.htm,.txt" />
+          </label>
+          <div class="upload-progress hidden" id="upload-progress" role="status">
+            <div class="progress-copy">
+              <span id="upload-label">Uploading…</span>
+              <span id="upload-percent">0%</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+          </div>
+        </section>
+
+        <section class="library" aria-labelledby="library-title">
+          <div class="library-heading">
+            <div>
+              <div class="section-kicker">02 / LIBRARY</div>
+              <h2 id="library-title">Documents</h2>
+            </div>
+            <span class="doc-count" id="doc-count">0</span>
+          </div>
+          <div class="document-list" id="document-list" aria-live="polite"></div>
+          <div class="empty-library" id="empty-library">
+            <span>No documents yet.</span>
+            <small>Your indexed files will appear here.</small>
+          </div>
+        </section>
+
+        <div class="sidebar-footer">
+          <span class="health-dot" id="health-dot"></span>
+          <span id="health-label">Connecting to pipeline…</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <div class="section-kicker">03 / RETRIEVE + ANSWER</div>
+            <h1>Ask your knowledge.</h1>
+          </div>
+          <div class="topbar-actions">
+            <a class="secondary-button" href="/architecture">Explore architecture</a>
+            <button class="secondary-button" id="clear-chat" type="button">Clear conversation</button>
+          </div>
+        </header>
+
+        <section class="pipeline-strip" aria-label="How the pipeline works">
+          <div class="pipeline-step"><span>FILE</span><small>saved</small></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step"><span>CHUNKS</span><small>meaningful sections</small></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step"><span>VECTORS</span><small>stored by us</small></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step"><span>MATCH</span><small>ranked evidence</small></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step accent"><span>ANSWER</span><small>with sources</small></div>
+        </section>
+
+        <section class="conversation" id="conversation" aria-live="polite">
+          <div class="welcome" id="welcome">
+            <div class="welcome-symbol" aria-hidden="true">⌁</div>
+            <p class="welcome-label">READY WHEN YOUR DOCUMENTS ARE</p>
+            <h2>A clear answer starts<br />with clear evidence.</h2>
+            <p>Upload a document, wait until it is indexed, then ask a question. Every answer shows the exact chunks that were retrieved.</p>
+            <div class="example-questions">
+              <button type="button" data-question="Summarize the main points across my documents.">Summarize the main points</button>
+              <button type="button" data-question="What important dates or deadlines are mentioned?">Find dates and deadlines</button>
+              <button type="button" data-question="Where do the documents disagree?">Compare the documents</button>
+            </div>
+          </div>
+        </section>
+
+        <form class="composer" id="question-form">
+          <label class="sr-only" for="question-input">Ask a question about your documents</label>
+          <textarea id="question-input" rows="1" placeholder="Ask something contained in your documents…" disabled></textarea>
+          <div class="composer-footer">
+            <span id="composer-hint">Upload and index a document to begin</span>
+            <button id="send-button" type="submit" disabled aria-label="Send question">
+              <span>ASK</span><span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <template id="document-template">
+      <article class="document-row">
+        <div class="file-glyph" aria-hidden="true">DOC</div>
+        <div class="document-info">
+          <strong class="document-name"></strong>
+          <span class="document-meta"></span>
+          <div class="stage-track"><span class="stage-fill"></span></div>
+        </div>
+        <button class="icon-button delete-document" type="button" aria-label="Delete document">×</button>
+      </article>
+    </template>
+
+    <template id="message-template">
+      <article class="message">
+        <div class="message-role"></div>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script src="/static/app.js?v=20260910" defer></script>
+  </body>
+</html>

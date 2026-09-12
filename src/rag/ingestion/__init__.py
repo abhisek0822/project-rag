@@ -1,0 +1,82 @@
+"""Custom document-ingestion pipeline public API."""
+
+from .chunking import Chunker, approximate_token_count, deduplicate_chunks
+from .errors import (
+    ChunkingError,
+    DocumentParseError,
+    EmbeddingError,
+    EmbeddingValidationError,
+    EmptyDocumentError,
+    IndexingError,
+    IngestionError,
+    IngestionStatus,
+    NeedsOCRError,
+    ParserDependencyError,
+    UnsupportedFileTypeError,
+)
+from .identifiers import canonical_text, content_hash, deterministic_chunk_id
+from .models import BLOCK_KINDS, Block, Chunk
+from .normalization import Normalizer, normalize_text
+from .parsers import (
+    SUPPORTED_EXTENSIONS,
+    SUPPORTED_FILE_EXTENSIONS,
+    SUPPORTED_FILE_TYPES,
+    DocxParser,
+    HTMLParser,
+    MarkdownParser,
+    Parser,
+    ParserRegistry,
+    PDFParser,
+    TextParser,
+    parse_document,
+    parser_for,
+)
+from .service import (
+    BlobStore,
+    EmbeddingProvider,
+    IngestionRepository,
+    IngestionResult,
+    IngestionService,
+)
+
+__all__ = [
+    "BLOCK_KINDS",
+    "SUPPORTED_EXTENSIONS",
+    "SUPPORTED_FILE_EXTENSIONS",
+    "SUPPORTED_FILE_TYPES",
+    "BlobStore",
+    "Block",
+    "Chunk",
+    "Chunker",
+    "ChunkingError",
+    "DocumentParseError",
+    "DocxParser",
+    "EmbeddingError",
+    "EmbeddingProvider",
+    "EmbeddingValidationError",
+    "EmptyDocumentError",
+    "HTMLParser",
+    "IndexingError",
+    "IngestionError",
+    "IngestionRepository",
+    "IngestionResult",
+    "IngestionService",
+    "IngestionStatus",
+    "MarkdownParser",
+    "NeedsOCRError",
+    "Normalizer",
+    "PDFParser",
+    "Parser",
+    "ParserDependencyError",
+    "ParserRegistry",
+    "TextParser",
+    "UnsupportedFileTypeError",
+    "approximate_token_count",
+    "canonical_text",
+    "content_hash",
+    "deduplicate_chunks",
+    "deterministic_chunk_id",
+    "normalize_text",
+    "parse_document",
+    "parser_for",
+]
